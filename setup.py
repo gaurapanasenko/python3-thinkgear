@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name='tinkgear-py3',
+    name='thinkgear-py3',
     version='0.1',
     packages=find_packages(),
     author='Yehor Panasenko',
