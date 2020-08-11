@@ -23,6 +23,7 @@ def parse(packet: bytes):
 
 class _Parser:
     """Parses byte data from ThinkGear Serial Stream."""
+
     def __init__(self, packet: bytes):
         self._packet: bytes = packet
         self._index: int = 0
@@ -35,7 +36,7 @@ class _Parser:
         code = self._pop_code()
         return _create_data_point(code, self._pop_data(code))
 
-    def _pop_code(self):
+    def _pop_code(self) -> int:
         # EXTENDED_CODE_BYTES seem not to be used according to
         # http://wearcam.org/ece516/mindset_communications_protocol.pdf
         # (August 2012)
@@ -45,17 +46,17 @@ class _Parser:
             if code != EXTENDED_CODE_BYTE:
                 return code
 
-    def _pop_bytes(self, size: int = 1):
+    def _pop_bytes(self, size: int = 1) -> bytes:
         index = self._index
         self._index += size
-        return self._packet[index:index+size]
+        return self._packet[index : index + size]
 
-    def _pop_data(self, code):
+    def _pop_data(self, code: int) -> bytes:
         return self._pop_bytes(self._pop_length(code))
 
-    def _pop_length(self, code):
+    def _pop_length(self, code: int) -> int:
         # If code is one of the mysterious initial code values
         # return before the extended code check
-        if code == 0xBA or code == 0xBC or code <= 0x7f:
+        if code == 0xBA or code == 0xBC or code <= 0x7F:
             return 1
         return ord(self._pop_bytes())
