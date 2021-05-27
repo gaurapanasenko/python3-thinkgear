@@ -24,6 +24,13 @@ class UnknownDataPoint(DataPoint):
         return f"Unknown OpCode. Value: {self.value}"
 
 
+class BatteryDataPoint(DataPoint):
+    """Battery level data point."""
+
+    def __str__(self):
+        return f"Battery Level: {self.value}"
+
+
 class PoorSignalDataPoint(DataPoint):
     """Poor signal level data point."""
 
@@ -98,6 +105,7 @@ class EegDataPoints(
 
 
 DATA_POINTS: Dict[int, type] = {
+    0x01: BatteryDataPoint,
     0x02: PoorSignalDataPoint,
     0x04: AttentionDataPoint,
     0x05: MeditationDataPoint,

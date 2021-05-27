@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="thinkgear-py3",
-    version="0.2",
+    version="0.3",
     packages=find_packages(),
     author="Yehor Panasenko",
     author_email="gaura.panasenko@gmail.com",
