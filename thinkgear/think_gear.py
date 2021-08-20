@@ -29,7 +29,9 @@ def discover(lookup_name: str = "MindWave") -> Optional[Tuple[str, int]]:
     return None
 
 
-def connect(address: Optional[Tuple[str, int]] = None) -> Optional[bluetooth.BluetoothSocket]:
+def connect(
+    address: Optional[Tuple[str, int]] = None
+) -> Optional[bluetooth.BluetoothSocket]:
     """Connect device using address and port."""
     if address is None:
         address = discover()
