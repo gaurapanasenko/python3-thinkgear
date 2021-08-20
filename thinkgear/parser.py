@@ -52,11 +52,17 @@ class _Parser:
         return self._packet[index : index + size]
 
     def _pop_data(self, code: int) -> bytes:
-        return self._pop_bytes(self._pop_length(code))
+        size = self._pop_length(code)
+        if size == -1:
+            return b""
+        return self._pop_bytes(size)
 
     def _pop_length(self, code: int) -> int:
         # If code is one of the mysterious initial code values
         # return before the extended code check
         if code == 0xBA or code == 0xBC or code <= 0x7F:
             return 1
+        byte = self._pop_bytes()
+        if len(byte) != 1:
+            return -1
         return ord(self._pop_bytes())
