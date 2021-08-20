@@ -1,4 +1,4 @@
-from typing import List, Dict
+from typing import List, Dict, Union, Type
 from collections import namedtuple
 
 
@@ -13,21 +13,23 @@ def _eeg_from_bytes(data: bytes) -> List[int]:
 class DataPoint(namedtuple("DataPoint", "data, value")):
     """Data point, contains raw data bytes and integer value from this data."""
 
-    def __new__(cls, data):
+    SIZE = 1
+
+    def __new__(cls, data: bytes) -> "DataPoint":
         return super().__new__(cls, data, data[0])
 
 
 class UnknownDataPoint(DataPoint):
     """Unknown data point."""
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Unknown OpCode. Value: {self.value}"
 
 
 class BatteryDataPoint(DataPoint):
     """Battery level data point."""
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Battery Level: {self.value}"
 
 
@@ -35,11 +37,11 @@ class PoorSignalDataPoint(DataPoint):
     """Poor signal level data point."""
 
     @property
-    def has_contact(self):
+    def has_contact(self) -> bool:
         """Headset has contact to skin."""
-        return self.value < 200
+        return bool(self.value < 200)
 
-    def __str__(self):
+    def __str__(self) -> str:
         string = f"Poor Signal Level: {self.value}"
         if not self.has_contact:
             string += " - NO CONTACT TO SKIN"
@@ -49,33 +51,35 @@ class PoorSignalDataPoint(DataPoint):
 class AttentionDataPoint(DataPoint):
     """Attention level data point."""
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Attention Level: {self.value}"
 
 
 class MeditationDataPoint(DataPoint):
     """Meditation level data point."""
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Meditation Level: {self.value}"
 
 
 class BlinkDataPoint(DataPoint):
     """Blink level data point."""
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Blink Level: {self.value}"
 
 
 class RawDataPoint(namedtuple("RawDataPoint", "data, value")):
     """Raw data point."""
 
-    def __new__(cls, data):
+    SIZE = 0
+
+    def __new__(cls, data: bytes) -> "RawDataPoint":
         return super().__new__(
             cls, data, int.from_bytes(data, byteorder="big", signed=True)
         )
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Raw Value: {self.value}"
 
 
@@ -87,10 +91,12 @@ class EegDataPoints(
 ):
     """Electroencephalogram data points."""
 
-    def __new__(cls, data):
+    SIZE = 8
+
+    def __new__(cls, data: bytes) -> "EegDataPoints":
         return super().__new__(cls, data, *_eeg_from_bytes(data))
 
-    def __str__(self):
+    def __str__(self) -> str:
         # pylint: disable=missing-format-attribute
         return f"""EEG Powers:
                 delta: {self.delta}
@@ -104,7 +110,9 @@ class EegDataPoints(
                 """
 
 
-DATA_POINTS: Dict[int, type] = {
+DataPointType = Union[DataPoint, RawDataPoint, EegDataPoints]
+
+DATA_POINTS: Dict[int, Type[DataPointType]] = {
     0x01: BatteryDataPoint,
     0x02: PoorSignalDataPoint,
     0x04: AttentionDataPoint,

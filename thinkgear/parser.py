@@ -1,18 +1,18 @@
-from thinkgear.data_points import DATA_POINTS
+from typing import List
+from thinkgear.data_points import DATA_POINTS, DataPointType, RawDataPoint
 
 
 EXTENDED_CODE_BYTE: int = 0x55
 
 
-def _empty_data_point(data):
-    return data
+def _create_data_point(code: int, data: bytes) -> DataPointType:
+    point_type = DATA_POINTS.get(code, RawDataPoint)
+    if len(data) < point_type.SIZE:
+        return RawDataPoint(data)
+    return point_type(data)
 
 
-def _create_data_point(code, data):
-    return DATA_POINTS.get(code, _empty_data_point)(data)
-
-
-def parse(packet: bytes):
+def parse(packet: bytes) -> List[DataPointType]:
     """Parse packet from ThinkGear Serial Stream."""
     parser = _Parser(packet)
     data_points = []
@@ -28,10 +28,10 @@ class _Parser:
         self._packet: bytes = packet
         self._index: int = 0
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         return not self._index == len(self._packet)
 
-    def pop_data_point(self):
+    def pop_data_point(self) -> DataPointType:
         """Pop one data point from packet."""
         code = self._pop_code()
         return _create_data_point(code, self._pop_data(code))

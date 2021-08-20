@@ -1,18 +1,17 @@
-import collections
-import os
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 
 import bluetooth
 
 
 from thinkgear.parser import parse
+from thinkgear.data_points import DataPointType
 
 START_OF_PACKET = b"\xaa\xaa"
 
 BUFFER_SIZE = 4096
 
 
-def discover(lookup_name: str = "MindWave"):
+def discover(lookup_name: str = "MindWave") -> Optional[Tuple[str, int]]:
     """Find some device by name."""
     nearby_devices = bluetooth.discover_devices(lookup_names=True)
     for address, name in nearby_devices:
@@ -30,7 +29,7 @@ def discover(lookup_name: str = "MindWave"):
     return None
 
 
-def connect(address: Tuple[str, int] = None) -> Optional[bluetooth.BluetoothSocket]:
+def connect(address: Optional[Tuple[str, int]] = None) -> Optional[bluetooth.BluetoothSocket]:
     """Connect device using address and port."""
     if address is None:
         address = discover()
@@ -46,35 +45,38 @@ def connect(address: Tuple[str, int] = None) -> Optional[bluetooth.BluetoothSock
     return socket
 
 
-def _check_sum(payload, check_sum):
+def _check_sum(payload: bytes, check_sum: int) -> bool:
     return (~(sum(payload) % 256)) + 256 == check_sum
 
 
 class ThinkGear:
     """Read data by ThinkGear Serial Stream Protocol."""
 
-    def __init__(self, address=None):
-        self._address = address
+    def __init__(self, address: Optional[Tuple[str, int]] = None):
+        self._address: Optional[Tuple[str, int]] = address
         self._buffer: bytearray = bytearray()
-        self.socket = None
-        self._data_points = []
+        self.socket: Optional[bluetooth.BluetoothSocket] = None
+        self._data_points: List[DataPointType] = []
 
-    def connect(self):
+    def connect(self) -> None:
         """Connect to device."""
         self.socket = connect(self._address)
 
-    def is_connected(self):
+    def is_connected(self) -> bool:
         """Check is connected to device."""
         return self.socket is not None
 
-    def read(self):
+    def read(self) -> DataPointType:
         """Read one data point."""
         if len(self._data_points) <= 0:
             self._data_points = self.readall()
         return self._data_points.pop()
 
-    def readall(self) -> list:
+    def readall(self) -> List[DataPointType]:
         """Read bunch of data points."""
+        if self.socket is None:
+            return []
+
         data = self.socket.recv(BUFFER_SIZE)
         if not data:
             return []
