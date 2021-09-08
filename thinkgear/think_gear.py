@@ -4,9 +4,10 @@ import bluetooth
 
 
 from thinkgear.parser import parse
-from thinkgear.data_points import DataPointType
+from thinkgear.data_points import DataPointType, RawDataPoint
 
 START_OF_PACKET = b"\xaa\xaa"
+START_OF_PACKET_SIZE = len(START_OF_PACKET)
 
 BUFFER_SIZE = 4096
 
@@ -29,90 +30,125 @@ def discover(lookup_name: str = "MindWave") -> Optional[Tuple[str, int]]:
     return None
 
 
-def connect(
-    address: Optional[Tuple[str, int]] = None
-) -> Optional[bluetooth.BluetoothSocket]:
-    """Connect device using address and port."""
-    if address is None:
-        address = discover()
-
-    if address is None:
-        return None
-
-    socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-    try:
-        socket.connect(address)
-    except bluetooth.btcommon.BluetoothError:
-        return None
-    return socket
-
-
 def _check_sum(payload: bytes, check_sum: int) -> bool:
-    return (~(sum(payload) % 256)) + 256 == check_sum
+    return (~(sum(payload) & 0xFF) & 0xFF) == check_sum
 
 
-class ThinkGear:
+class ThinkGearProtocol:
     """Read data by ThinkGear Serial Stream Protocol."""
 
-    def __init__(self, address: Optional[Tuple[str, int]] = None):
-        self._address: Optional[Tuple[str, int]] = address
+    def __init__(self) -> None:
         self._buffer: bytearray = bytearray()
-        self.socket: Optional[bluetooth.BluetoothSocket] = None
         self._data_points: List[DataPointType] = []
 
-    def connect(self) -> None:
-        """Connect to device."""
-        self.socket = connect(self._address)
+    def _recv(self) -> bytes:
+        """Receive from device."""
+        return b""
 
-    def is_connected(self) -> bool:
-        """Check is connected to device."""
-        return self.socket is not None
-
-    def read(self) -> DataPointType:
+    def read(self) -> Optional[DataPointType]:
         """Read one data point."""
         if len(self._data_points) <= 0:
             self._data_points = self.readall()
+        if len(self._data_points) <= 0:
+            return None
         return self._data_points.pop()
 
-    def readall(self) -> List[DataPointType]:
-        """Read bunch of data points."""
-        if self.socket is None:
-            return []
+    def skip_to_beginning(self) -> None:
+        """Find beginning of packet."""
+        data_beginning = self._buffer.find(START_OF_PACKET)
+        self._buffer = self._buffer[data_beginning:]
 
-        data = self.socket.recv(BUFFER_SIZE)
-        if not data:
-            return []
+    def pop_packet(self) -> bytes:
+        """Get data from one packet."""
+        self._buffer += self._recv()
 
-        self._buffer += data
+        while True:
+            self.skip_to_beginning()
 
-        data_points = self._data_points
-        self._data_points = []
-
-        while len(self._buffer) >= 3:
-            # Go to start of packet
-            if not self._buffer.startswith(START_OF_PACKET):
-                del self._buffer[0]
-                continue
+            if len(self._buffer) < 3:
+                # there is not enough data in buffer, exit
+                return b""
 
             size = self._buffer[2]
-
-            if not size or size < 0:
-                # got bad size, ignore this packet
-                del self._buffer[:2]
+            if size <= 0:
+                # got bad size
+                del self._buffer[0]
                 continue
 
             if size + 4 > len(self._buffer):
                 # there is not enough data in buffer, exit
-                break
+                return b""
 
             packet = self._buffer[3 : size + 3]
             check_sum = self._buffer[size + 3]
             del self._buffer[: size + 4]
 
-            if _check_sum(packet, check_sum):
-                data_points += parse(packet)
+            if not _check_sum(packet, check_sum):
+                continue
+
+            return packet
+
+        return b""
+
+    def pop(self) -> List[DataPointType]:
+        return parse(self.pop_packet())
+
+    def readall(self) -> List[DataPointType]:
+        """Read bunch of data points."""
+
+        data_points = self._data_points
+        self._data_points = []
+        points: List[DataPointType] = [RawDataPoint(0, 0, b"")]
+
+        while points:
+            points = self.pop()
+            data_points += points
 
         if not data_points:
             raise BlockingIOError("No data points")
 
         return data_points
+
+
+class ThinkGearBluetooth(ThinkGearProtocol):
+    """Bluetooth communication with Think Gear device."""
+
+    def __init__(self, address: Optional[Tuple[str, int]] = None):
+        super().__init__()
+        self._address: Optional[Tuple[str, int]] = address
+        self.socket: Optional[bluetooth.BluetoothSocket] = None
+
+    @staticmethod
+    def connect_device(
+        address: Optional[Tuple[str, int]] = None
+    ) -> Optional[bluetooth.BluetoothSocket]:
+        """Connect device using address and port."""
+        if address is None:
+            address = discover()
+
+        if address is None:
+            return None
+
+        socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+        try:
+            socket.connect(address)
+        except bluetooth.btcommon.BluetoothError:
+            return None
+        return socket
+
+    def connect(self) -> None:
+        """Connect to device."""
+        self.socket = self.connect_device(self._address)
+
+    def is_connected(self) -> bool:
+        """Check is connected to device."""
+        return self.socket is not None
+
+    def _recv(self) -> bytes:
+        """Receive data from bluetooth device."""
+        if self.socket is None:
+            return b""
+        return self.socket.recv(BUFFER_SIZE)
+
+
+ThinkGear = ThinkGearBluetooth

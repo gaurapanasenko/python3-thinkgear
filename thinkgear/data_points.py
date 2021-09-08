@@ -10,13 +10,13 @@ def _eeg_from_bytes(data: bytes) -> List[int]:
     ]
 
 
-class DataPoint(namedtuple("DataPoint", "data, value")):
+class DataPoint(namedtuple("DataPoint", "level, code, data, value")):
     """Data point, contains raw data bytes and integer value from this data."""
 
     SIZE = 1
 
-    def __new__(cls, data: bytes) -> "DataPoint":
-        return super().__new__(cls, data, data[0])
+    def __new__(cls, level: int, code: int, data: bytes) -> "DataPoint":
+        return super().__new__(cls, level, code, data, data[0])
 
 
 class UnknownDataPoint(DataPoint):
@@ -69,14 +69,14 @@ class BlinkDataPoint(DataPoint):
         return f"Blink Level: {self.value}"
 
 
-class RawDataPoint(namedtuple("RawDataPoint", "data, value")):
+class RawDataPoint(namedtuple("RawDataPoint", "level, code, data, value")):
     """Raw data point."""
 
     SIZE = 0
 
-    def __new__(cls, data: bytes) -> "RawDataPoint":
+    def __new__(cls, level: int, code: int, data: bytes) -> "RawDataPoint":
         return super().__new__(
-            cls, data, int.from_bytes(data, byteorder="big", signed=True)
+            cls, level, code, data, int.from_bytes(data, byteorder="big", signed=True)
         )
 
     def __str__(self) -> str:
@@ -86,15 +86,15 @@ class RawDataPoint(namedtuple("RawDataPoint", "data, value")):
 class EegDataPoints(
     namedtuple(
         "RawDataPoint",
-        "data, delta, theta, lowAlpha, highAlpha, lowBeta, highBeta, lowGamma, midGamma",
+        "level, code, data, delta, theta, lowAlpha, highAlpha, lowBeta, highBeta, lowGamma, midGamma",
     )
 ):
     """Electroencephalogram data points."""
 
     SIZE = 8
 
-    def __new__(cls, data: bytes) -> "EegDataPoints":
-        return super().__new__(cls, data, *_eeg_from_bytes(data))
+    def __new__(cls, level: int, code: int, data: bytes) -> "EegDataPoints":
+        return super().__new__(cls, level, code, data, *_eeg_from_bytes(data))
 
     def __str__(self) -> str:
         # pylint: disable=missing-format-attribute
