@@ -58,9 +58,10 @@ class ThinkGearProtocol:
         data_beginning = self._buffer.find(START_OF_PACKET)
         self._buffer = self._buffer[data_beginning:]
 
-    def pop_packet(self) -> bytes:
+    def pop_packet(self, recv: bool = True) -> bytes:
         """Get data from one packet."""
-        self._buffer += self._recv()
+        if recv:
+            self._buffer += self._recv()
 
         while True:
             self.skip_to_beginning()
@@ -90,18 +91,19 @@ class ThinkGearProtocol:
 
         return b""
 
-    def pop(self) -> List[DataPointType]:
-        return parse(self.pop_packet())
+    def pop(self, recv: bool = True) -> List[DataPointType]:
+        return parse(self.pop_packet(recv))
 
     def readall(self) -> List[DataPointType]:
         """Read bunch of data points."""
+        self._buffer += self._recv()
 
         data_points = self._data_points
         self._data_points = []
         points: List[DataPointType] = [RawDataPoint(0, 0, b"")]
 
         while points:
-            points = self.pop()
+            points = self.pop(False)
             data_points += points
 
         if not data_points:
