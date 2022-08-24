@@ -1,19 +1,16 @@
 from typing import Tuple, Optional, List
 
-import bluetooth
-
-
 from thinkgear.parser import parse
 from thinkgear.data_points import DataPointType, RawDataPoint
 
 START_OF_PACKET = b"\xaa\xaa"
 START_OF_PACKET_SIZE = len(START_OF_PACKET)
 
-BUFFER_SIZE = 4096
-
 
 def discover(lookup_name: str = "MindWave") -> Optional[Tuple[str, int]]:
     """Find some device by name."""
+    import bluetooth
+
     nearby_devices = bluetooth.discover_devices(lookup_names=True)
     for address, name in nearby_devices:
         if lookup_name in name:
@@ -37,8 +34,9 @@ def _check_sum(payload: bytes, check_sum: int) -> bool:
 class ThinkGearProtocol:
     """Read data by ThinkGear Serial Stream Protocol."""
 
-    def __init__(self) -> None:
+    def __init__(self, debug: bool = False) -> None:
         self._buffer: bytearray = bytearray()
+        self._debug: bool = False
         self._data_points: List[DataPointType] = []
 
     def _recv(self) -> bytes:
@@ -73,6 +71,8 @@ class ThinkGearProtocol:
             size = self._buffer[2]
             if size <= 0:
                 # got bad size
+                if self._debug:
+                    print("ThinkGearProtocol: Got bad size of packet")
                 del self._buffer[0]
                 continue
 
@@ -82,9 +82,17 @@ class ThinkGearProtocol:
 
             packet = self._buffer[3 : size + 3]
             check_sum = self._buffer[size + 3]
+            old = self._buffer[: size + 10]
             del self._buffer[: size + 4]
 
             if not _check_sum(packet, check_sum):
+                if self._debug:
+                    print(
+                        "ThinkGearProtocol: Bad packet checksum",
+                        old,
+                        check_sum,
+                        _check_sum(packet, check_sum),
+                    )
                 continue
 
             return packet
@@ -92,7 +100,11 @@ class ThinkGearProtocol:
         return b""
 
     def pop(self, recv: bool = True) -> List[DataPointType]:
-        return parse(self.pop_packet(recv))
+        pack = self.pop_packet(recv)
+        p = parse(pack)
+        if self._debug and (len(pack) not in [7, 4]):
+            print("ThinkGearProtocol: unusual packet size", p, len(pack))
+        return p
 
     def readall(self) -> List[DataPointType]:
         """Read bunch of data points."""
@@ -110,47 +122,3 @@ class ThinkGearProtocol:
             raise BlockingIOError("No data points")
 
         return data_points
-
-
-class ThinkGearBluetooth(ThinkGearProtocol):
-    """Bluetooth communication with Think Gear device."""
-
-    def __init__(self, address: Optional[Tuple[str, int]] = None):
-        super().__init__()
-        self._address: Optional[Tuple[str, int]] = address
-        self.socket: Optional[bluetooth.BluetoothSocket] = None
-
-    @staticmethod
-    def connect_device(
-        address: Optional[Tuple[str, int]] = None
-    ) -> Optional[bluetooth.BluetoothSocket]:
-        """Connect device using address and port."""
-        if address is None:
-            address = discover()
-
-        if address is None:
-            return None
-
-        socket = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-        try:
-            socket.connect(address)
-        except bluetooth.btcommon.BluetoothError:
-            return None
-        return socket
-
-    def connect(self) -> None:
-        """Connect to device."""
-        self.socket = self.connect_device(self._address)
-
-    def is_connected(self) -> bool:
-        """Check is connected to device."""
-        return self.socket is not None
-
-    def _recv(self) -> bytes:
-        """Receive data from bluetooth device."""
-        if self.socket is None:
-            return b""
-        return self.socket.recv(BUFFER_SIZE)
-
-
-ThinkGear = ThinkGearBluetooth
