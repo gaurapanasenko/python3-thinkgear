@@ -2,7 +2,7 @@ from typing import Any, Tuple, Optional
 
 try:
     from bluetooth import discover_devices, find_service
-except ImportError:
+except AttributeError:
 
     def discover_devices(*args: Any, **kwargs: Any) -> Optional[list[Any]]:
         raise NotImplementedError("Failed to import bluetooth")
