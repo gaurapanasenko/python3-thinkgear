@@ -1,124 +1,102 @@
-from typing import Tuple, Optional, List
-
+from typing import List
 from thinkgear.parser import parse
-from thinkgear.data_points import DataPointType, RawDataPoint
+from thinkgear.data_points import DataPointType
 
-START_OF_PACKET = b"\xaa\xaa"
-START_OF_PACKET_SIZE = len(START_OF_PACKET)
-
-
-def discover(lookup_name: str = "MindWave") -> Optional[Tuple[str, int]]:
-    """Find some device by name."""
-    import bluetooth
-
-    nearby_devices = bluetooth.discover_devices(lookup_names=True)
-    for address, name in nearby_devices:
-        if lookup_name in name:
-            services = bluetooth.find_service(address=address)
-            try:
-                port = next(
-                    i["port"]
-                    for i in services
-                    if i["protocol"] == "RFCOMM" and i["port"]
-                )
-                return (address, port)
-            except StopIteration:
-                pass
-    return None
-
-
-def _check_sum(payload: bytes, check_sum: int) -> bool:
-    return (~(sum(payload) & 0xFF) & 0xFF) == check_sum
+SYNC = 0xAA
+EXCODE = 0x55
 
 
 class ThinkGearProtocol:
-    """Read data by ThinkGear Serial Stream Protocol."""
+    """
+    A base class to interface with ThinkGear devices using the ThinkGear Serial Stream Protocol.
+
+    This class provides methods to read and parse data transmitted by ThinkGear devices.
+    It is intended as an abstract class and should be subclassed to implement the `_recv` method for
+    actual device communication.
+
+    Attributes:
+        _debug (bool): Flag to enable or disable debug mode. If enabled, additional debugging
+                      information may be printed or logged.
+    """
 
     def __init__(self, debug: bool = False) -> None:
-        self._buffer: bytearray = bytearray()
-        self._debug: bool = False
-        self._data_points: List[DataPointType] = []
+        """
+        Initialize the ThinkGearProtocol instance.
 
-    def _recv(self) -> bytes:
-        """Receive from device."""
-        return b""
+        Args:
+            debug (bool): If True, enables debugging mode for additional logging. Defaults to False.
+        """
+        self._debug: bool = debug
 
-    def read(self) -> Optional[DataPointType]:
-        """Read one data point."""
-        if len(self._data_points) <= 0:
-            self._data_points = self.readall()
-        if len(self._data_points) <= 0:
-            return None
-        return self._data_points.pop()
+    def _recv(self, size: int = 1) -> bytes:
+        """
+        Abstract method for receiving bytes from the device.
 
-    def skip_to_beginning(self) -> None:
-        """Find beginning of packet."""
-        data_beginning = self._buffer.find(START_OF_PACKET)
-        self._buffer = self._buffer[data_beginning:]
+        This method must be overridden by subclasses to implement actual communication
+        with the ThinkGear device.
 
-    def pop_packet(self, recv: bool = True) -> bytes:
-        """Get data from one packet."""
-        if recv:
-            self._buffer += self._recv()
+        Args:
+            size (int): The number of bytes to read. Defaults to 1.
 
+        Returns:
+            bytes: The received bytes.
+
+        Raises:
+            NotImplementedError: If this method is not overridden in a subclass.
+        """
+        raise NotImplementedError("The _recv method must be implemented by subclasses.")
+
+    def read(self) -> List[DataPointType]:
+        """
+        Read and parse a single data payload from the ThinkGear device.
+
+        The method synchronizes on the SYNC bytes, validates the payload length,
+        calculates a checksum, and verifies it against the received checksum.
+        The payload is parsed into a list of data points.
+
+        Returns:
+            List[DataPointType]: A list of parsed data points, or an empty list if parsing fails.
+
+        Raises:
+            IOError: If the full payload cannot be read.
+        """
         while True:
-            self.skip_to_beginning()
+            # Synchronize on [SYNC] bytes
+            for _ in range(2):
+                c = self._recv()[0]
+                if c != SYNC:
+                    if self._debug:
+                        print("Failed to synchronize on SYNC byte.")
+                    continue
 
-            if len(self._buffer) < 3:
-                # there is not enough data in buffer, exit
-                return b""
+            # Parse [PLENGTH] byte
+            while True:
+                pLength = self._recv()[0]
+                if pLength != SYNC:
+                    break
 
-            size = self._buffer[2]
-            if size <= 0:
-                # got bad size
+            if pLength > 169:
                 if self._debug:
-                    print("ThinkGearProtocol: Got bad size of packet")
-                del self._buffer[0]
+                    print(f"Invalid payload length: {pLength}.")
                 continue
 
-            if size + 4 > len(self._buffer):
-                # there is not enough data in buffer, exit
-                return b""
+            # Collect [PAYLOAD...] bytes
+            payload = self._recv(pLength)
+            if len(payload) != pLength:
+                raise IOError("Did not receive the full payload.")
 
-            packet = self._buffer[3 : size + 3]
-            check_sum = self._buffer[size + 3]
-            old = self._buffer[: size + 10]
-            del self._buffer[: size + 4]
+            # Compute [PAYLOAD...] checksum
+            checksum = sum(payload) & 0xFF
+            checksum = ~checksum & 0xFF
 
-            if not _check_sum(packet, check_sum):
+            # Parse [CKSUM] byte
+            received_checksum = self._recv()[0]
+
+            # Verify [PAYLOAD...] checksum against [CKSUM]
+            if received_checksum != checksum:
                 if self._debug:
                     print(
-                        "ThinkGearProtocol: Bad packet checksum",
-                        old,
-                        check_sum,
-                        _check_sum(packet, check_sum),
+                        f"Checksum mismatch: calculated={checksum}, received={received_checksum}."
                     )
                 continue
-
-            return packet
-
-        return b""
-
-    def pop(self, recv: bool = True) -> List[DataPointType]:
-        pack = self.pop_packet(recv)
-        p = parse(pack)
-        if self._debug and (len(pack) not in [7, 4]):
-            print("ThinkGearProtocol: unusual packet size", p, len(pack))
-        return p
-
-    def readall(self) -> List[DataPointType]:
-        """Read bunch of data points."""
-        self._buffer += self._recv()
-
-        data_points = self._data_points
-        self._data_points = []
-        points: List[DataPointType] = [RawDataPoint(0, 0, b"")]
-
-        while points:
-            points = self.pop(False)
-            data_points += points
-
-        if not data_points:
-            raise BlockingIOError("No data points")
-
-        return data_points
+            return parse(payload)

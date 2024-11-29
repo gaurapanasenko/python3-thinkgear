@@ -32,7 +32,7 @@ def parse(payload: bytes) -> List[DataPointType]:
         code = payload[bytesParsed]
         bytesParsed += 1
         # ~ if code & 0x80 and code not in [0xBA, 0xBC]:
-        if code in [0x80, 0x83]:
+        if code & 0x80 and code & 0xB0 != 0xB0:
             length = payload[bytesParsed]
             bytesParsed += 1
         else:
