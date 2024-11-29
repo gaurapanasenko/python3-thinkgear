@@ -8,13 +8,13 @@ long_description = (this_directory / "README.rst").read_text()
 
 setup(
     name="thinkgear-py3",
-    version="2.1",
+    version="2.2",
     packages=find_packages(),
     author="Yehor Panasenko",
     author_email="gaura.panasenko@gmail.com",
     description="ThinkGear Serial Stream Protocol implementation",
     url="https://github.com/gaurapanasenko/python3-thinkgear",
-    install_requires=["pybluez2", "pyserial"],
+    install_requires=[],
     long_description=long_description,
     long_description_content_type="text/x-rst",
 )
