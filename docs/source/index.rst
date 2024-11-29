@@ -1,18 +1,16 @@
-Welcome to ThinkGear's documentation!
-===================================
-
-
-Check out the :doc:`usage` section for further information, including
-how to :ref:`installation` the project.
+ThinkGear documentation
+=======================
 
 .. note::
 
    This project is under active development.
 
-Contents
---------
+
+.. include:: ../../README.rst
 
 .. toctree::
+   :maxdepth: 2
+   :caption: Contents:
 
-   usage
+   README
    api

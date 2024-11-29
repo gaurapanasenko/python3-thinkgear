@@ -1,5 +1,7 @@
-from typing import Tuple, Optional, List
+from typing import Tuple, Optional
 import bluetooth
+
+__all__ = ("discover",)
 
 
 def discover(lookup_name: str = "MindWave") -> Optional[Tuple[str, int]]:

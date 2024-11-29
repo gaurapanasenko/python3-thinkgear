@@ -1,7 +1,14 @@
 API
 ===
 
-.. autosummary::
-   :toctree: generated
+.. automodule:: thinkgear
+    :members:
 
-   thinkgear
+.. automodule:: thinkgear.bluetooth
+    :members:
+
+.. automodule:: thinkgear.discover
+    :members:
+
+.. automodule:: thinkgear.serial
+    :members:

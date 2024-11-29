@@ -91,6 +91,15 @@ class ThinkGearSerial(ThinkGearProtocol):
         """
         return self.device is not None
 
+    def get_device(self) -> Optional[serial.Serial]:
+        """
+        Get current instance of serial device.
+
+        Returns:
+            serial.Serial: serial device object
+        """
+        return self.device
+
     def _recv(self, size: int = 1) -> bytes:
         """
         Receive data from the ThinkGear device via the serial interface.

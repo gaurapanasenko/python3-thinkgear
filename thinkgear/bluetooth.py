@@ -79,6 +79,15 @@ class ThinkGearBluetooth(ThinkGearProtocol):
         """
         return self.socket is not None
 
+    def get_device(self) -> Optional[socket.socket]:
+        """
+        Get current instance of bluetooth socket device.
+
+        Returns:
+            socket.socket: socket object connected to device
+        """
+        return self.socket
+
     def _recv(self, size: int = 1) -> bytes:
         """
         Receive data from the ThinkGear device via Bluetooth.
