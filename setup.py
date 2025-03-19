@@ -8,7 +8,7 @@ long_description = (this_directory / "README.rst").read_text()
 
 setup(
     name="thinkgear-py3",
-    version="2.2",
+    version="2.3",
     packages=find_packages(),
     author="Yehor Panasenko",
     author_email="gaura.panasenko@gmail.com",
