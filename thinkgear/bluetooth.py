@@ -54,7 +54,7 @@ class ThinkGearBluetooth(ThinkGearProtocol):
         Raises:
             socket.error: If the connection fails.
         """
-        self.socket = self.connect_device(address)
+        self.device = self.connect_device(address)
         if self._debug:
             print(f"Connected to device at {address}.")
 
@@ -64,9 +64,9 @@ class ThinkGearBluetooth(ThinkGearProtocol):
 
         Closes the Bluetooth socket and sets it to None.
         """
-        if self.socket is not None:
-            self.socket.close()
-            self.socket = None
+        if self.device is not None:
+            self.device.close()
+            self.device = None
             if self._debug:
                 print("Disconnected from device.")
 
@@ -77,7 +77,7 @@ class ThinkGearBluetooth(ThinkGearProtocol):
         Returns:
             bool: True if the device is connected, False otherwise.
         """
-        return self.socket is not None
+        return self.device is not None
 
     def get_device(self) -> Optional[socket.socket]:
         """
@@ -86,7 +86,7 @@ class ThinkGearBluetooth(ThinkGearProtocol):
         Returns:
             socket.socket: socket object connected to device
         """
-        return self.socket
+        return self.device
 
     def _recv(self, size: int = 1) -> bytes:
         """
@@ -100,11 +100,11 @@ class ThinkGearBluetooth(ThinkGearProtocol):
         Returns:
             bytes: The received data. Returns an empty byte string if not connected.
         """
-        if self.socket is None:
+        if self.device is None:
             if self._debug:
                 print("Attempt to receive data without an active connection.")
             return b""
-        data = self.socket.recv(size)
+        data = self.device.recv(size)
         if self._debug:
             print(f"Received data: {data!r}")
         return data
